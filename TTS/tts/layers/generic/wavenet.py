@@ -2,7 +2,8 @@ import torch
 from torch import nn
 
 
-@torch.jit.script
+# @torch.jit.script
+@torch.jit._script_if_tracing  # AF fix for pyinstaller
 def fused_add_tanh_sigmoid_multiply(input_a, input_b, n_channels):
     n_channels_int = n_channels[0]
     in_act = input_a + input_b
@@ -34,15 +35,15 @@ class WN(torch.nn.Module):
     """
 
     def __init__(
-        self,
-        in_channels,
-        hidden_channels,
-        kernel_size,
-        dilation_rate,
-        num_layers,
-        c_in_channels=0,
-        dropout_p=0,
-        weight_norm=True,
+            self,
+            in_channels,
+            hidden_channels,
+            kernel_size,
+            dilation_rate,
+            num_layers,
+            c_in_channels=0,
+            dropout_p=0,
+            weight_norm=True,
     ):
         super().__init__()
         assert kernel_size % 2 == 1
@@ -65,7 +66,7 @@ class WN(torch.nn.Module):
             self.cond_layer = torch.nn.utils.weight_norm(cond_layer, name="weight")
         # intermediate layers
         for i in range(num_layers):
-            dilation = dilation_rate**i
+            dilation = dilation_rate ** i
             padding = int((kernel_size * dilation - dilation) / 2)
             if i == 0:
                 in_layer = torch.nn.Conv1d(
@@ -101,14 +102,14 @@ class WN(torch.nn.Module):
             x_in = self.dropout(x_in)
             if g is not None:
                 cond_offset = i * 2 * self.hidden_channels
-                g_l = g[:, cond_offset : cond_offset + 2 * self.hidden_channels, :]
+                g_l = g[:, cond_offset: cond_offset + 2 * self.hidden_channels, :]
             else:
                 g_l = torch.zeros_like(x_in)
             acts = fused_add_tanh_sigmoid_multiply(x_in, g_l, n_channels_tensor)
             res_skip_acts = self.res_skip_layers[i](acts)
             if i < self.num_layers - 1:
                 x = (x + res_skip_acts[:, : self.hidden_channels, :]) * x_mask
-                output = output + res_skip_acts[:, self.hidden_channels :, :]
+                output = output + res_skip_acts[:, self.hidden_channels:, :]
             else:
                 output = output + res_skip_acts
         return output * x_mask
@@ -142,16 +143,16 @@ class WNBlocks(nn.Module):
     """
 
     def __init__(
-        self,
-        in_channels,
-        hidden_channels,
-        kernel_size,
-        dilation_rate,
-        num_blocks,
-        num_layers,
-        c_in_channels=0,
-        dropout_p=0,
-        weight_norm=True,
+            self,
+            in_channels,
+            hidden_channels,
+            kernel_size,
+            dilation_rate,
+            num_blocks,
+            num_layers,
+            c_in_channels=0,
+            dropout_p=0,
+            weight_norm=True,
     ):
         super().__init__()
         self.wn_blocks = nn.ModuleList()
